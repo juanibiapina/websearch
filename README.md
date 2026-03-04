@@ -44,6 +44,14 @@ BRAVE_API_KEY       # https://api-dashboard.search.brave.com
 SERPAPI_KEY          # https://serpapi.com/manage-api-key
 ```
 
+## AI Agent Skill
+
+This repo includes a skill file that teaches AI coding agents how to use websearch. Install it with:
+
+```bash
+npx skills add juanibiapina/websearch
+```
+
 ## License
 
 MIT
