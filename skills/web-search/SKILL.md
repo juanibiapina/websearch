@@ -12,7 +12,7 @@ Multi-provider web search and content extraction via the `websearch` CLI.
 ### search — Find web pages
 
 ```bash
-websearch search "query"                       # Search (default: Tavily)
+websearch search "query"                       # Search (default: Brave)
 websearch search "query" -p brave              # Specific provider
 websearch search "query" -n 10                 # More results (default: 5)
 websearch search "query" --content             # Include page content
@@ -63,14 +63,14 @@ All commands support `--json` for raw JSON output.
 | brave | Independent index, privacy-focused | ~1,000/month |
 | serpapi | YouTube, Scholar, Amazon (40+ engines) | 100/month |
 
-**Defaults:** search→tavily, extract→local, answer→tavily, similar→exa, code→exa
+**Defaults:** search→brave, extract→local, answer→tavily, similar→exa, code→exa
 
 ### Provider characteristics
 
-- **tavily** (default): Returns the richest snippets — noticeably more extracted content per result than other providers. Good mix of official docs and community sources. Best general-purpose choice.
+- **tavily**: Returns the richest snippets — noticeably more extracted content per result than other providers. Good mix of official docs and community sources. Best general-purpose choice.
 - **exa**: Semantic/neural search — finds the freshest content and understands meaning beyond keywords. Great for "what's the latest on X" or exploratory queries. Can occasionally return lower-quality SEO-heavy content for common topics. Only provider with `similar` and `code` commands.
 - **websearchapi**: Google-powered results. Reliably surfaces canonical/official sources (official docs, Stack Overflow). Most generous free tier (2,000/month) — good fallback when other quotas run low.
-- **brave**: Independent index (not Google/Bing). Also reliably surfaces official docs and vendor guides. Good alternative perspective to Google-based results.
+- **brave** (default): Independent index (not Google/Bing). Also reliably surfaces official docs and vendor guides. Good alternative perspective to Google-based results.
 - **serpapi**: Tight free tier (100/month) and sometimes returns fewer results than requested. Reserve for specialized engines: `-p serpapi --engine youtube` for video tutorials, `--engine google_scholar` for academic papers, `--engine google_news` for news.
 
 ## Setup

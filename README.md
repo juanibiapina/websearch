@@ -11,7 +11,7 @@ npm install -g @juanibiapina/websearch
 ## Usage
 
 ```bash
-websearch search "query"                       # Search (default: Tavily)
+websearch search "query"                       # Search (default: Brave)
 websearch search "query" -p brave              # Specific provider
 websearch search "query" -n 10                 # More results (default: 5)
 websearch search "query" --content             # Include page content

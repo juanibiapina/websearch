@@ -82,7 +82,7 @@ const PROVIDERS: Record<string, ProviderConfig> = {
 const SUBCOMMANDS: Record<string, SubcommandConfig> = {
   search: {
     providers: ["tavily", "exa", "websearchapi", "brave", "serpapi"],
-    default: "tavily",
+    default: "brave",
   },
   extract: { providers: [], default: null },
   answer: { providers: ["tavily", "exa", "websearchapi"], default: "tavily" },
