@@ -29,7 +29,12 @@ All commands support `--json` for raw JSON output.
 | exa | Semantic search | 1,000/month |
 | websearchapi | Google-powered search, generous quota | 2,000/month |
 | brave | Independent index, privacy-focused | ~1,000/month |
-| serpapi | YouTube, Scholar, Amazon (40+ engines) | 100/month |
+| google | Web search via Google | 250/month* |
+| scholar | Academic papers | 250/month* |
+| youtube | Video search | 250/month* |
+| amazon | Product search | 250/month* |
+
+*google, scholar, youtube, and amazon share a single SerpAPI quota (250/month).
 
 ## Environment Variables
 
@@ -38,7 +43,7 @@ TAVILY_API_KEY      # https://app.tavily.com
 EXA_API_KEY         # https://dashboard.exa.ai
 WEBSEARCHAPI_KEY    # https://websearchapi.ai
 BRAVE_API_KEY       # https://api-dashboard.search.brave.com
-SERPAPI_KEY         # https://serpapi.com/manage-api-key
+SERPAPI_KEY         # google, scholar, youtube, amazon (https://serpapi.com/manage-api-key)
 ```
 
 ## AI Agent Skill

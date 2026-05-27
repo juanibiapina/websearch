@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default search provider switched from Tavily to Brave
+- Replaced `serpapi` provider and `--engine` flag with individual `google`, `scholar`, `youtube`, `amazon` providers
 
 ### Fixed
 
 - `extract` command crashing with "document is not defined" in Node.js
+- fixed `--country` flag for all providers
 
 ### Removed
 

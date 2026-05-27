@@ -45,7 +45,7 @@ Environment variables:
   EXA_API_KEY                 Exa (https://dashboard.exa.ai)
   WEBSEARCHAPI_KEY            WebSearchAPI.ai (https://websearchapi.ai)
   BRAVE_API_KEY               Brave Search (https://api-dashboard.search.brave.com)
-  SERPAPI_KEY                  SerpAPI (https://serpapi.com/manage-api-key)
+  SERPAPI_KEY                 Google, Scholar, YouTube, Amazon (https://serpapi.com/manage-api-key)
   WEBSEARCH_DEFAULT_PROVIDER  Override default provider for search`,
   );
 
@@ -63,7 +63,6 @@ program
   .option("--content", "Include page content")
   .option("--freshness <period>", "Filter: day, week, month, year")
   .option("--country <code>", "Two-letter country code")
-  .option("--engine <name>", "SerpAPI engine", "google")
   .option("--json", "Output raw JSON")
   .action(async (queryParts: string[], opts) => {
     const query = queryParts.join(" ");
@@ -73,7 +72,6 @@ program
       content: opts.content ?? false,
       freshness: opts.freshness ?? null,
       country: opts.country ?? null,
-      engine: opts.engine,
     });
     if (opts.json) console.log(JSON.stringify(results, null, 2));
     else printResults(results);

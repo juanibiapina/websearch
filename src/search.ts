@@ -23,7 +23,26 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     name: "Brave Search",
     url: "https://api-dashboard.search.brave.com",
   },
-  serpapi: { env: "SERPAPI_KEY", name: "SerpAPI", url: "https://serpapi.com/manage-api-key" },
+  google: {
+    env: "SERPAPI_KEY",
+    name: "Google (SerpAPI)",
+    url: "https://serpapi.com/manage-api-key",
+  },
+  scholar: {
+    env: "SERPAPI_KEY",
+    name: "Google Scholar (SerpAPI)",
+    url: "https://serpapi.com/manage-api-key",
+  },
+  youtube: {
+    env: "SERPAPI_KEY",
+    name: "YouTube (SerpAPI)",
+    url: "https://serpapi.com/manage-api-key",
+  },
+  amazon: {
+    env: "SERPAPI_KEY",
+    name: "Amazon (SerpAPI)",
+    url: "https://serpapi.com/manage-api-key",
+  },
 };
 
 export const PROVIDER_NAMES = Object.keys(PROVIDERS);
@@ -34,7 +53,6 @@ export interface SearchOptions {
   content: boolean;
   freshness: string | null;
   country: string | null;
-  engine: string;
 }
 
 // === Utilities ===
@@ -68,6 +86,11 @@ function freshnessDate(period: string): string | null {
   return d.toISOString();
 }
 
+const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+function countryName(code: string): string {
+  return (regionNames.of(code.toUpperCase()) || code).toLowerCase();
+}
+
 // === Search Providers ===
 
 // biome-ignore lint/suspicious/noExplicitAny: provider API responses are untyped
@@ -82,7 +105,7 @@ async function searchTavily(query: string, opts: SearchOptions): Promise<SearchR
   };
   if (opts.content) body.include_raw_content = "markdown";
   if (opts.freshness) body.time_range = opts.freshness;
-  if (opts.country) body.country = opts.country;
+  if (opts.country) body.country = countryName(opts.country);
 
   const data: APIResponse = await fetchJSON("https://api.tavily.com/search", {
     method: "POST",
@@ -186,48 +209,98 @@ async function searchBrave(query: string, opts: SearchOptions): Promise<SearchRe
   return results;
 }
 
-async function searchSerpAPI(query: string, opts: SearchOptions): Promise<SearchResult[]> {
-  const key = getKey("serpapi");
-  const engine = opts.engine || "google";
-  // Different engines use different query parameter names
-  const queryParamMap: Record<string, string> = {
-    youtube: "search_query",
-    walmart: "query",
-    ebay: "_nkw",
-    naver: "query",
+// === SerpAPI Engine Configuration ===
+
+interface SerpAPIEngineConfig {
+  engine: string;
+  queryParam: string;
+  resultFields: string[];
+  countryParam?: (code: string) => [string, string];
+}
+
+const SERPAPI_ENGINES: Record<string, SerpAPIEngineConfig> = {
+  google: { engine: "google", queryParam: "q", resultFields: ["organic_results"] },
+  scholar: {
+    engine: "google_scholar",
+    queryParam: "q",
+    resultFields: ["organic_results"],
+  },
+  youtube: {
+    engine: "youtube",
+    queryParam: "search_query",
+    resultFields: ["video_results"],
+  },
+  amazon: {
+    engine: "amazon",
+    queryParam: "k",
+    resultFields: ["organic_results", "shopping_results"],
+    countryParam: (code) => {
+      const domains: Record<string, string> = {
+        us: "amazon.com",
+        uk: "amazon.co.uk",
+        gb: "amazon.co.uk",
+        de: "amazon.de",
+        fr: "amazon.fr",
+        es: "amazon.es",
+        it: "amazon.it",
+        ca: "amazon.ca",
+        jp: "amazon.co.jp",
+        au: "amazon.com.au",
+        br: "amazon.com.br",
+        mx: "amazon.com.mx",
+        in: "amazon.in",
+      };
+      return ["amazon_domain", domains[code.toLowerCase()] || "amazon.com"];
+    },
+  },
+};
+
+function makeSerpAPISearch(config: SerpAPIEngineConfig): SearchFn {
+  return async (query: string, opts: SearchOptions): Promise<SearchResult[]> => {
+    const key = getKey(opts.provider);
+    const params = new URLSearchParams({
+      engine: config.engine,
+      [config.queryParam]: query,
+      api_key: key,
+      num: opts.numResults.toString(),
+    });
+    if (opts.freshness) {
+      const map: Record<string, string> = {
+        day: "qdr:d",
+        week: "qdr:w",
+        month: "qdr:m",
+        year: "qdr:y",
+      };
+      if (map[opts.freshness]) params.set("tbs", map[opts.freshness]);
+    }
+    if (opts.country) {
+      if (config.countryParam) {
+        const [key, value] = config.countryParam(opts.country);
+        params.set(key, value);
+      } else {
+        params.set("gl", opts.country.toLowerCase());
+      }
+    }
+
+    const data: APIResponse = await fetchJSON(`https://serpapi.com/search.json?${params}`);
+
+    const raw =
+      config.resultFields.reduce(
+        (found, field) => found || data[field],
+        undefined as APIResponse,
+      ) || [];
+    return raw.slice(0, opts.numResults).map((r: APIResponse) => ({
+      title: r.title || "",
+      url: r.link || "",
+      snippet:
+        r.snippet ||
+        r.description ||
+        [r.price, r.rating && `${r.rating}★`].filter(Boolean).join(" · ") ||
+        "",
+      age: r.date || r.published_date || null,
+      content: null,
+    }));
   };
-  const queryParam = queryParamMap[engine] || "q";
-  const params = new URLSearchParams({
-    engine,
-    [queryParam]: query,
-    api_key: key,
-    num: opts.numResults.toString(),
-  });
-  if (opts.freshness) {
-    const map: Record<string, string> = {
-      day: "qdr:d",
-      week: "qdr:w",
-      month: "qdr:m",
-      year: "qdr:y",
-    };
-    if (map[opts.freshness]) params.set("tbs", map[opts.freshness]);
-  }
-  if (opts.country) params.set("gl", opts.country.toLowerCase());
-
-  const data: APIResponse = await fetchJSON(`https://serpapi.com/search.json?${params}`);
-
-  // Different engines return results in different fields
-  const raw =
-    data.organic_results || data.video_results || data.shopping_results || data.jobs_results || [];
-  const results: SearchResult[] = raw.slice(0, opts.numResults).map((r: APIResponse) => ({
-    title: r.title || "",
-    url: r.link || "",
-    snippet: r.snippet || r.description || "",
-    age: r.date || r.published_date || null,
-    content: null,
-  }));
-
-  return results;
 }
 
 // === Search Orchestration ===
@@ -239,7 +312,10 @@ const SEARCH_FNS: Record<string, SearchFn> = {
   exa: searchExa,
   websearchapi: searchWebSearchAPI,
   brave: searchBrave,
-  serpapi: searchSerpAPI,
+  google: makeSerpAPISearch(SERPAPI_ENGINES.google),
+  scholar: makeSerpAPISearch(SERPAPI_ENGINES.scholar),
+  youtube: makeSerpAPISearch(SERPAPI_ENGINES.youtube),
+  amazon: makeSerpAPISearch(SERPAPI_ENGINES.amazon),
 };
 
 export async function search(query: string, opts: SearchOptions): Promise<SearchResult[]> {

@@ -1,6 +1,6 @@
 ---
 name: web-search
-description: Web search, content extraction, and research via multiple providers (Tavily, Exa, Brave, etc.). Use when searching for documentation, facts, current information, extracting content from URLs, or fetching pages. Triggers on "search for", "look up", "find information", "extract content", "fetch page", "search the web", "research", or any web lookup task.
+description: Web search and content extraction. Use when searching the web for documentation, facts or research. Triggers on "search", "look up", "find information", "search the web", "research", or any web lookup task.
 ---
 
 # Web Search
@@ -18,7 +18,9 @@ websearch search "query" -n 10                 # More results (default: 5)
 websearch search "query" --content             # Include page content
 websearch search "query" --freshness week      # Filter: day, week, month, year
 websearch search "query" --country DE          # Country-specific results
-websearch search "query" -p serpapi --engine google_scholar  # SerpAPI engine
+websearch search "query" -p scholar            # Academic papers
+websearch search "query" -p youtube            # Video search
+websearch search "query" -p amazon             # Product search
 ```
 
 ### extract — Get page content as markdown
@@ -42,17 +44,25 @@ All commands support `--json` for raw JSON output.
 | exa | Semantic search | 1,000/month |
 | websearchapi | Google-powered search, generous quota | 2,000/month |
 | brave | Independent index, privacy-focused | ~1,000/month |
-| serpapi | YouTube, Scholar, Amazon (40+ engines) | 100/month |
+| google | Web search via Google | 250/month* |
+| scholar | Academic papers | 250/month* |
+| youtube | Video search | 250/month* |
+| amazon | Product search | 250/month* |
+
+*google, scholar, youtube, and amazon share a single SerpAPI quota (250/month).
 
 **Defaults:** search→brave, extract→local
 
 ### Provider characteristics
 
-- **tavily**: Returns the richest snippets — noticeably more extracted content per result than other providers. Good mix of official docs and community sources. Best general-purpose choice.
-- **exa**: Semantic/neural search — finds the freshest content and understands meaning beyond keywords. Great for "what's the latest on X" or exploratory queries. Can occasionally return lower-quality SEO-heavy content for common topics.
-- **websearchapi**: Google-powered results. Reliably surfaces canonical/official sources (official docs, Stack Overflow). Most generous free tier (2,000/month) — good fallback when other quotas run low.
-- **brave** (default): Independent index (not Google/Bing). Also reliably surfaces official docs and vendor guides. Good alternative perspective to Google-based results.
-- **serpapi**: Tight free tier (100/month) and sometimes returns fewer results than requested. Reserve for specialized engines: `-p serpapi --engine youtube` for video tutorials, `--engine google_scholar` for academic papers, `--engine google_news` for news.
+- **brave** (default): Independent index (not Google/Bing). Reliably surfaces official docs first. Good general-purpose choice.
+- **tavily**: Returns the longest snippets by far — 3-5x more text per result than other providers. Tends to surface blogs and community content (Medium, dev.to) over official docs. Good when you want rich context without using `--content`.
+- **exa**: Semantic/neural search — understands meaning beyond keywords. Great for technical queries and "what's the latest on X".
+- **websearchapi**: Google-powered results. Good default when other quotas run low.
+- **google**: Google results via SerpAPI. Similar results to websearchapi. Shares a tighter free tier (250/month) — prefer brave or websearchapi for general searches.
+- **scholar**: Academic papers and citations from Google Scholar.
+- **youtube**: Video search results from YouTube.
+- **amazon**: Product search with prices and ratings from Amazon.
 
 ## Setup
 
@@ -63,12 +73,13 @@ TAVILY_API_KEY      # https://app.tavily.com
 EXA_API_KEY         # https://dashboard.exa.ai
 WEBSEARCHAPI_KEY    # https://websearchapi.ai
 BRAVE_API_KEY       # https://api-dashboard.search.brave.com
-SERPAPI_KEY          # https://serpapi.com/manage-api-key
+SERPAPI_KEY          # google, scholar, youtube, amazon (https://serpapi.com/manage-api-key)
 ```
 
 ## Tips
 
 - Use `--content` to include page text in search results (avoids a separate extract call)
 - Use `extract` to read long documentation pages (free, no API credits)
-- Use `-p serpapi --engine youtube` to search YouTube, or `--engine google_scholar` for papers
+- Use `-p scholar` for academic papers, `-p youtube` for video tutorials, `-p amazon` for products
+- google, scholar, youtube, and amazon share a single SerpAPI quota — use sparingly
 - When a provider's quota runs low, switch with `-p`
