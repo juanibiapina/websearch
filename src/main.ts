@@ -271,6 +271,7 @@ function freshnessDate(period: string): string | null {
 // === Local Content Extraction (HTML → Markdown) ===
 
 function htmlToMarkdown(html: string): string {
+  const dom = new JSDOM(html);
   const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
   turndown.use(gfm);
   turndown.addRule("removeEmptyLinks", {
@@ -278,7 +279,7 @@ function htmlToMarkdown(html: string): string {
     replacement: () => "",
   });
   return turndown
-    .turndown(html)
+    .turndown(dom.window.document.body)
     .replace(/\[\\?\[\s*\\?\]\]\([^)]*\)/g, "")
     .replace(/ +/g, " ")
     .replace(/\s+,/g, ",")

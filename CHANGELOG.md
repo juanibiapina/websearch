@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default search provider switched from Tavily to Brave
 
+### Fixed
+
+- `extract` command crashing with "document is not defined" in Node.js
+
 ### Removed
 
 - `answer` command (direct answers with citations)
