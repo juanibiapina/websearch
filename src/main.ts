@@ -31,18 +31,6 @@ interface Options {
   json: boolean;
 }
 
-interface PartialOptions {
-  subcommand: string;
-  query: string | null;
-  provider: string | null;
-  numResults: number;
-  content: boolean;
-  freshness: string | null;
-  country: string | null;
-  engine: string;
-  json: boolean;
-}
-
 interface SearchResult {
   title: string;
   url: string;
@@ -104,17 +92,13 @@ function parseArgs(argv: string[]): Options {
   const defaultProvider =
     envProvider && sub.providers.includes(envProvider) ? envProvider : sub.default;
 
-  const opts: PartialOptions = {
-    subcommand,
-    query: null,
-    provider: defaultProvider,
-    numResults: 5,
-    content: false,
-    freshness: null,
-    country: null,
-    engine: "google",
-    json: false,
-  };
+  let provider: string | null = defaultProvider;
+  let numResults = 5;
+  let content = false;
+  let freshness: string | null = null;
+  let country: string | null = null;
+  let engine = "google";
+  let json = false;
 
   const rest = args.slice(1);
 
@@ -130,25 +114,25 @@ function parseArgs(argv: string[]): Options {
     switch (arg) {
       case "--provider":
       case "-p":
-        opts.provider = rest[++i];
+        provider = rest[++i];
         break;
       case "-n":
-        opts.numResults = parseInt(rest[++i], 10);
+        numResults = parseInt(rest[++i], 10);
         break;
       case "--content":
-        opts.content = true;
+        content = true;
         break;
       case "--freshness":
-        opts.freshness = rest[++i];
+        freshness = rest[++i];
         break;
       case "--country":
-        opts.country = rest[++i];
+        country = rest[++i];
         break;
       case "--engine":
-        opts.engine = rest[++i];
+        engine = rest[++i];
         break;
       case "--json":
-        opts.json = true;
+        json = true;
         break;
       default:
         if (arg.startsWith("-")) {
@@ -160,22 +144,32 @@ function parseArgs(argv: string[]): Options {
     i++;
   }
 
-  opts.query = positionals.join(" ");
+  const query = positionals.join(" ");
 
-  if (!opts.query) {
+  if (!query) {
     console.error("Missing required argument: query/URL");
     printSubcommandHelp(subcommand);
     process.exit(1);
   }
 
   // extract is always local — no provider selection
-  if (subcommand !== "extract" && opts.provider && !sub.providers.includes(opts.provider)) {
-    console.error(`Provider '${opts.provider}' does not support '${subcommand}'.`);
+  if (subcommand !== "extract" && provider && !sub.providers.includes(provider)) {
+    console.error(`Provider '${provider}' does not support '${subcommand}'.`);
     console.error(`Available: ${sub.providers.join(", ")}`);
     process.exit(1);
   }
 
-  return opts as Options;
+  return {
+    subcommand,
+    query,
+    provider: provider || "",
+    numResults,
+    content,
+    freshness,
+    country,
+    engine,
+    json,
+  };
 }
 
 // === Help ===
