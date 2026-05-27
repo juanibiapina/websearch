@@ -20,8 +20,10 @@ websearch search "query" --freshness week      # Filter: day, week, month, year
 websearch search "query" --country DE          # Country-specific results
 websearch search "query" -p scholar            # Academic papers
 websearch search "query" -p youtube            # Video search
-websearch search "query" -p amazon             # Product search
+websearch search "query" -p amazon --country US  # Product search
 ```
+
+`--content` and `--country` work with all providers. `--freshness` works with all except youtube and amazon.
 
 ### extract — Get page content as markdown
 
@@ -30,56 +32,41 @@ websearch extract "https://example.com/article"
 websearch extract "https://docs.rust-lang.org/book/ch04-01-what-is-ownership.html"
 ```
 
-Extraction is always local (fetches HTML, parses with Readability, converts to markdown). No API credits used.
-
-
-
 All commands support `--json` for raw JSON output.
 
-## Provider Guide
+## Providers
 
-| Provider | Best for | Free tier |
-|---|---|---|
-| tavily | General AI-optimized search | 1,000/month |
-| exa | Semantic search | 1,000/month |
-| websearchapi | Google-powered search, generous quota | 2,000/month |
-| brave | Independent index, privacy-focused | ~1,000/month |
-| google | Web search via Google | 250/month* |
-| scholar | Academic papers | 250/month* |
-| youtube | Video search | 250/month* |
-| amazon | Product search | 250/month* |
+Default provider is **brave**. Override with `-p <name>`.
 
-*google, scholar, youtube, and amazon share a single SerpAPI quota (250/month).
+| Provider | Source |
+|---|---|
+| brave | Brave independent index |
+| tavily | Tavily AI search |
+| exa | Exa neural/semantic index |
+| websearchapi | Google (via WebSearchAPI.ai) |
+| google | Google (via SerpAPI) |
+| scholar | Google Scholar (via SerpAPI) |
+| youtube | YouTube (via SerpAPI) |
+| amazon | Amazon product search (via SerpAPI) |
+### Provider details
 
-**Defaults:** search→brave, extract→local
-
-### Provider characteristics
-
-- **brave** (default): Independent index (not Google/Bing). Reliably surfaces official docs first. Good general-purpose choice.
-- **tavily**: Returns the longest snippets by far — 3-5x more text per result than other providers. Tends to surface blogs and community content (Medium, dev.to) over official docs. Good when you want rich context without using `--content`.
-- **exa**: Semantic/neural search — understands meaning beyond keywords. Great for technical queries and "what's the latest on X".
-- **websearchapi**: Google-powered results. Good default when other quotas run low.
-- **google**: Google results via SerpAPI. Similar results to websearchapi. Shares a tighter free tier (250/month) — prefer brave or websearchapi for general searches.
-- **scholar**: Academic papers and citations from Google Scholar.
-- **youtube**: Video search results from YouTube.
-- **amazon**: Product search with prices and ratings from Amazon.
+- **brave**: Returns short snippets (~200-300 chars).
+- **tavily**: Returns long snippets (~800-1100 chars).
+- **exa**: Semantic search, matches by meaning not just keywords. Returns snippets (~200 chars).
+- **websearchapi**: Google-powered. Returns short snippets (~150 chars).
+- **google**: Google-powered. Returns short snippets (~150 chars).
+- **scholar**: Returns academic papers with citation snippets.
+- **youtube**: Returns video titles, links, and descriptions.
+- **amazon**: Returns product titles, prices, and ratings. `--country` maps to regional Amazon domains (e.g. `de` → amazon.de). Defaults to amazon.com.
 
 ## Setup
 
-Each provider needs an API key as an environment variable. Only configure the ones you use:
+Each provider needs an API key as an environment variable:
 
 ```
 TAVILY_API_KEY      # https://app.tavily.com
 EXA_API_KEY         # https://dashboard.exa.ai
 WEBSEARCHAPI_KEY    # https://websearchapi.ai
 BRAVE_API_KEY       # https://api-dashboard.search.brave.com
-SERPAPI_KEY          # google, scholar, youtube, amazon (https://serpapi.com/manage-api-key)
+SERPAPI_KEY         # google, scholar, youtube, amazon (https://serpapi.com/manage-api-key)
 ```
-
-## Tips
-
-- Use `--content` to include page text in search results (avoids a separate extract call)
-- Use `extract` to read long documentation pages (free, no API credits)
-- Use `-p scholar` for academic papers, `-p youtube` for video tutorials, `-p amazon` for products
-- google, scholar, youtube, and amazon share a single SerpAPI quota — use sparingly
-- When a provider's quota runs low, switch with `-p`

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default search provider switched from Tavily to Brave
+- Rewrite skill as a reference for the CLI (no prescribed workflows)
 - Replaced `serpapi` provider and `--engine` flag with individual `google`, `scholar`, `youtube`, `amazon` providers
 
 ### Fixed
