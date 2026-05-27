@@ -300,6 +300,33 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+function extractFromHtml(html: string, url: string): ExtractResult {
+  const dom = new JSDOM(html, { url });
+  const reader = new Readability(dom.window.document);
+  const article = reader.parse();
+
+  if (article?.content) {
+    return { title: article.title || null, content: htmlToMarkdown(article.content) };
+  }
+
+  // Fallback: strip noise elements and extract main content
+  const fallbackDoc = new JSDOM(html, { url });
+  const body = fallbackDoc.window.document;
+  for (const el of body.querySelectorAll("script, style, noscript, nav, header, footer, aside")) {
+    el.remove();
+  }
+
+  const title = body.querySelector("title")?.textContent?.trim() || null;
+  const main = body.querySelector("main, article, [role='main'], .content, #content") || body.body;
+  const text = main?.innerHTML || "";
+
+  if (text.trim().length > 100) {
+    return { title, content: htmlToMarkdown(text) };
+  }
+
+  throw new Error("Could not extract readable content from this page.");
+}
+
 async function fetchLocalContent(url: string): Promise<string> {
   try {
     const response = await fetch(url, {
@@ -310,29 +337,7 @@ async function fetchLocalContent(url: string): Promise<string> {
     if (!response.ok) return `(HTTP ${response.status})`;
 
     const html = await response.text();
-    const dom = new JSDOM(html, { url });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-
-    if (article?.content) {
-      return truncate(htmlToMarkdown(article.content));
-    }
-
-    // Fallback: try to get main content
-    const fallbackDoc = new JSDOM(html, { url });
-    const body = fallbackDoc.window.document;
-    for (const el of body.querySelectorAll("script, style, noscript, nav, header, footer, aside")) {
-      el.remove();
-    }
-    const main =
-      body.querySelector("main, article, [role='main'], .content, #content") || body.body;
-    const text = main?.textContent || "";
-
-    if (text.trim().length > 100) {
-      return truncate(text.trim());
-    }
-
-    return "(Could not extract content)";
+    return truncate(extractFromHtml(html, url).content);
   } catch (e) {
     return `(Error: ${(e as Error).message})`;
   }
@@ -349,30 +354,7 @@ async function extractLocal(url: string): Promise<ExtractResult> {
   }
 
   const html = await response.text();
-  const dom = new JSDOM(html, { url });
-  const reader = new Readability(dom.window.document);
-  const article = reader.parse();
-
-  if (article?.content) {
-    return { title: article.title || null, content: htmlToMarkdown(article.content) };
-  }
-
-  // Fallback: try to extract main content
-  const fallbackDoc = new JSDOM(html, { url });
-  const body = fallbackDoc.window.document;
-  for (const el of body.querySelectorAll("script, style, noscript, nav, header, footer, aside")) {
-    el.remove();
-  }
-
-  const title = body.querySelector("title")?.textContent?.trim() || null;
-  const main = body.querySelector("main, article, [role='main'], .content, #content") || body.body;
-  const text = main?.innerHTML || "";
-
-  if (text.trim().length > 100) {
-    return { title, content: htmlToMarkdown(text) };
-  }
-
-  throw new Error("Could not extract readable content from this page.");
+  return extractFromHtml(html, url);
 }
 
 // === Search Providers ===
