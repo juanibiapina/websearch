@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Automatically wait on provider rate limits: concurrent searches for a throttled provider (e.g. Brave, 1 request/second) are spaced apart instead of failing with HTTP 429, and a 429 response honors `Retry-After` with one retry
+
 ## [2.1.0] - 2026-05-27
 
 ### Added

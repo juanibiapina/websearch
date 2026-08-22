@@ -21,6 +21,7 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "vite build",
+    "test": "vitest run",
     "check": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -31,14 +32,17 @@
     "@mozilla/readability": "^0.6.0",
     "commander": "^15.0.0",
     "jsdom": "^29.1.1",
+    "proper-lockfile": "^4.1.2",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
     "@types/jsdom": "^28.0.3",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/turndown": "^5.0.6",
     "typescript": "^7.0.2",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.11"
   }
 }

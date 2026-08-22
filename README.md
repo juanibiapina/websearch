@@ -36,6 +36,21 @@ All commands support `--json` for raw JSON output.
 
 *google, scholar, youtube, and amazon share a single SerpAPI quota (250/month).
 
+## Rate limiting
+
+Some providers cap request rate (Brave's free tier allows 1 request per second).
+Because each `websearch` run is a separate process, the CLI coordinates through a
+per-provider file lock so concurrent invocations wait automatically instead of
+failing with HTTP 429:
+
+- Throttled providers are serialized and spaced by a minimum interval (Brave:
+  ~1s). Other providers run in parallel with no lock overhead.
+- The lock and last-request timestamp live under `$XDG_STATE_HOME/websearch`
+  (or the system temp dir). A stale lock from a crashed process is reclaimed
+  automatically.
+- On a 429 the CLI honors the `Retry-After` header and retries once, capped at
+  5 seconds.
+
 ## Environment Variables
 
 ```
