@@ -38,18 +38,18 @@ All commands support `--json` for raw JSON output.
 
 ## Rate limiting
 
-Some providers cap request rate (Brave's free tier allows 1 request per second).
-Because each `websearch` run is a separate process, the CLI coordinates through a
-per-provider file lock so concurrent invocations wait automatically instead of
-failing with HTTP 429:
+The CLI waits on provider rate limits automatically, driven by the server's
+`Retry-After` response. No provider rate is hard-coded.
 
-- Throttled providers are serialized and spaced by a minimum interval (Brave:
-  ~1s). Other providers run in parallel with no lock overhead.
-- The lock and last-request timestamp live under `$XDG_STATE_HOME/websearch`
-  (or the system temp dir). A stale lock from a crashed process is reclaimed
-  automatically.
-- On a 429 the CLI honors the `Retry-After` header and retries once, capped at
-  5 seconds.
+Because each `websearch` run is a separate process, provider calls are
+coordinated through a per-provider file lock:
+
+- When a request is rate limited (HTTP 429), the CLI honors the server's
+  `Retry-After` and retries.
+- The resulting deadline is persisted under `$XDG_STATE_HOME/websearch` (or the
+  system temp dir), so concurrent invocations back off together instead of each
+  triggering their own 429.
+- A stale lock from a crashed process is reclaimed automatically.
 
 ## Environment Variables
 

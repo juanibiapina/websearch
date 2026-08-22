@@ -1,5 +1,5 @@
 import { fetchLocalContent } from "./extract.ts";
-import { withRateLimit } from "./ratelimit.ts";
+import { RateLimitError, withRateLimit } from "./ratelimit.ts";
 import type { SearchResult } from "./types.ts";
 import { truncate } from "./types.ts";
 
@@ -69,44 +69,36 @@ function getKey(provider: string): string {
   return key;
 }
 
-const MAX_RETRY_AFTER_MS = 5000;
+// Delay used when a 429 omits Retry-After. Only a fallback for a missing header,
+// not a per-provider rate assumption.
 const DEFAULT_RETRY_AFTER_MS = 1000;
 
-type Sleep = (ms: number) => Promise<void>;
-const realSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Parse a Retry-After header (delta-seconds only) into a capped millisecond
-// delay. Missing or non-numeric values fall back to a default; the cap bounds a
-// hostile or huge value so a retry never wedges the process.
+// Parse a Retry-After header (delta-seconds) into a millisecond delay, honoring
+// whatever the server asks. Missing or non-numeric values fall back to the
+// default.
 function retryAfterMs(header: string | null): number {
   const seconds = header ? Number.parseInt(header, 10) : Number.NaN;
   const ms = Number.isFinite(seconds) ? seconds * 1000 : DEFAULT_RETRY_AFTER_MS;
-  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, ms));
+  return Math.max(0, ms);
 }
 
 export async function fetchJSON(
   url: string,
   options: RequestInit = {},
-  sleep: Sleep = realSleep,
 ): Promise<Record<string, unknown>> {
   if (!options.signal) options.signal = AbortSignal.timeout(30000);
 
-  // One reactive retry: proactive spacing cannot cover every burst, so honor a
-  // 429's Retry-After and try again once before failing.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await fetch(url, options);
-    if (response.status === 429 && attempt === 0) {
-      await sleep(retryAfterMs(response.headers.get("Retry-After")));
-      continue;
-    }
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HTTP ${response.status}: ${response.statusText}\n${text}`);
-    }
-    return response.json() as Promise<Record<string, unknown>>;
+  const response = await fetch(url, options);
+  // Surface rate limiting to the limiter, which owns the Retry-After wait and
+  // shares the deadline across processes.
+  if (response.status === 429) {
+    throw new RateLimitError(retryAfterMs(response.headers.get("Retry-After")));
   }
-  // Unreachable: the loop either returns or throws on the final attempt.
-  throw new Error("fetchJSON: exhausted retries");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${response.statusText}\n${text}`);
+  }
+  return response.json() as Promise<Record<string, unknown>>;
 }
 
 function freshnessDate(period: string): string | null {

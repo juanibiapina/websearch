@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RateLimitError } from "./ratelimit.ts";
 import { fetchJSON } from "./search.ts";
 
 function jsonResponse(body: unknown): Response {
@@ -14,45 +15,42 @@ function rateLimited(retryAfter?: string): Response {
   return new Response("slow down", { status: 429, statusText: "Too Many Requests", headers });
 }
 
-describe("fetchJSON 429 handling", () => {
+describe("fetchJSON", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("waits the Retry-After delay and retries once on 429", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(rateLimited("2"))
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
-    const sleeps: number[] = [];
+  it("throws a RateLimitError carrying the Retry-After delay on 429", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(rateLimited("2"));
 
-    const data = await fetchJSON("https://example.test/api", {}, async (ms) => {
-      sleeps.push(ms);
+    await expect(fetchJSON("https://example.test/api")).rejects.toMatchObject({
+      name: "RateLimitError",
+      retryAfterMs: 2000,
     });
-
-    expect(data).toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(sleeps).toEqual([2000]);
   });
 
-  it("caps the Retry-After wait at 5 seconds", async () => {
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(rateLimited("3600"))
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
-    const sleeps: number[] = [];
+  it("defaults the delay when a 429 omits Retry-After", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(rateLimited());
 
-    await fetchJSON("https://example.test/api", {}, async (ms) => {
-      sleeps.push(ms);
+    await expect(fetchJSON("https://example.test/api")).rejects.toMatchObject({
+      name: "RateLimitError",
+      retryAfterMs: 1000,
     });
-
-    expect(sleeps).toEqual([5000]);
   });
 
-  it("throws when a 429 persists after the retry", async () => {
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(rateLimited("1"))
-      .mockResolvedValueOnce(rateLimited("1"));
+  it("throws a plain error for other failures", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("boom", { status: 500, statusText: "Server Error" }),
+    );
 
-    await expect(fetchJSON("https://example.test/api", {}, async () => {})).rejects.toThrow(/429/);
+    const err = await fetchJSON("https://example.test/api").catch((e) => e);
+    expect(err).not.toBeInstanceOf(RateLimitError);
+    expect(String(err)).toMatch(/500/);
+  });
+
+  it("returns parsed JSON on success", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    expect(await fetchJSON("https://example.test/api")).toEqual({ ok: true });
   });
 });
