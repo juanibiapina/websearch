@@ -17,9 +17,13 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
+        // Node.js built-ins must resolve at runtime, not be browser-stubbed
+        /^node:/,
         // Keep deps with Node.js built-in requirements external
         "jsdom",
         "commander",
+        // CommonJS package with dynamic requires (graceful-fs); resolve at runtime
+        "proper-lockfile",
       ],
       output: {
         banner: "#!/usr/bin/env node",
