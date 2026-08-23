@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Rate-limit waiting is now driven entirely by the server's `Retry-After` response instead of a hard-coded per-provider interval; concurrent searches share the resulting deadline so they back off together
+
 ## [2.2.0] - 2026-08-22
 
 ### Added

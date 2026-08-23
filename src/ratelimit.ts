@@ -1,9 +1,12 @@
-// Per-provider cross-process rate limiting.
+// Per-provider cross-process rate limiting, driven entirely by the server's
+// Retry-After response. No provider rate is hard-coded.
 //
 // Each `websearch` run is a separate OS process, so an in-memory mutex cannot
-// coordinate concurrent invocations. This module serializes throttled providers
-// through a file lock and spaces their calls by a per-provider minimum interval,
-// persisting the last request time on disk so separate processes observe it.
+// coordinate concurrent invocations. Every provider call is serialized through a
+// per-provider file lock. When a call is rate limited, the server's Retry-After
+// deadline is persisted on disk; the next lock holder (any process) waits for
+// that shared deadline before trying again, so concurrent invocations back off
+// together instead of each burning their own 429.
 
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,19 +18,20 @@ export interface Clock {
   sleep: (ms: number) => Promise<void>;
 }
 
-interface ProviderLimit {
-  minIntervalMs: number;
-  // Providers sharing a lockGroup are serialized against the same lock and
-  // timestamp file (e.g. SerpAPI engines could share one vendor quota later).
-  lockGroup: string;
+// Thrown by the HTTP layer on a 429 so the limiter can honor Retry-After.
+export class RateLimitError extends Error {
+  readonly retryAfterMs: number;
+  constructor(retryAfterMs: number) {
+    super(`rate limited; retry after ${retryAfterMs}ms`);
+    this.name = "RateLimitError";
+    this.retryAfterMs = retryAfterMs;
+  }
 }
 
-// Only throttled providers appear here. Anything absent runs without a lock,
-// preserving full parallelism. Brave's free tier allows 1 request/second; the
-// margin over 1000ms absorbs clock skew and the "counted on arrival" window.
-const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
-  brave: { minIntervalMs: 1100, lockGroup: "brave" },
-};
+// Safety bound on how many times one call re-tries a rate-limited request. This
+// is not a rate value; it only stops an endlessly-429ing server from looping
+// forever. The wait between attempts always comes from Retry-After.
+const MAX_ATTEMPTS = 5;
 
 const realClock: Clock = {
   now: () => Date.now(),
@@ -35,8 +39,7 @@ const realClock: Clock = {
 };
 
 function defaultStateDir(): string {
-  const base = process.env.XDG_STATE_HOME || tmpdir();
-  return join(base, "websearch");
+  return join(process.env.XDG_STATE_HOME || tmpdir(), "websearch");
 }
 
 interface RateLimitOptions {
@@ -44,10 +47,9 @@ interface RateLimitOptions {
   stateDir?: string;
 }
 
-function readLastTimestamp(file: string): number {
+function readDeadline(file: string): number {
   try {
-    const raw = readFileSync(file, "utf8").trim();
-    const value = Number.parseInt(raw, 10);
+    const value = Number.parseInt(readFileSync(file, "utf8").trim(), 10);
     return Number.isFinite(value) ? value : 0;
   } catch {
     return 0;
@@ -67,29 +69,34 @@ export async function withRateLimit<T>(
   fn: () => Promise<T>,
   options: RateLimitOptions = {},
 ): Promise<T> {
-  const limit = PROVIDER_LIMITS[provider];
-  if (!limit) return fn();
-
   const clock = options.clock ?? realClock;
   const stateDir = options.stateDir ?? defaultStateDir();
   mkdirSync(stateDir, { recursive: true });
 
-  const tsFile = join(stateDir, `${limit.lockGroup}.timestamp`);
-  ensureFile(tsFile);
+  const file = join(stateDir, `${provider}.deadline`);
+  ensureFile(file);
 
-  const release = await lockfile.lock(tsFile, {
+  const release = await lockfile.lock(file, {
     retries: { retries: 30, factor: 1.5, minTimeout: 100, maxTimeout: 2000 },
     stale: 30000,
   });
   try {
-    const last = readLastTimestamp(tsFile);
-    const wait = last > 0 ? last + limit.minIntervalMs - clock.now() : 0;
-    if (wait > 0) await clock.sleep(wait);
+    let lastError: RateLimitError | undefined;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      // Wait for any deadline a prior call (in this or another process) recorded.
+      const wait = readDeadline(file) - clock.now();
+      if (wait > 0) await clock.sleep(wait);
 
-    // Stamp the arrival time before the call, then hold the lock across the
-    // call so a second process spaces itself from this arrival.
-    writeFileSync(tsFile, String(clock.now()));
-    return await fn();
+      try {
+        return await fn();
+      } catch (error) {
+        if (!(error instanceof RateLimitError)) throw error;
+        lastError = error;
+        // Persist the server-driven deadline so concurrent processes back off too.
+        writeFileSync(file, String(clock.now() + error.retryAfterMs));
+      }
+    }
+    throw lastError ?? new RateLimitError(0);
   } finally {
     await release();
   }
